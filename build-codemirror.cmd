@@ -1,0 +1,1 @@
+browserify --bare -r ksana-codemirror -x react -x react-dom> codemirror-bundle.js

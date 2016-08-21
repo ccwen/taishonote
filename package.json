@@ -1,0 +1,20 @@
+{
+  "name": "ksana2015-scaffold-default",
+  "description": "New Ksana application",
+  "version": "1.5.2",
+  "main": "index.html",
+  "inject-js-start":"nwmain.js",
+  "single-instance":true,
+  "window": {
+    "toolbar": true,
+    "width": 1060,
+    "height": 700
+  },
+  "scripts" : {
+  },
+ "repository": 
+  {
+      "type": "git", 
+      "url": "https://github.com/ksanaforge/taishonote"
+  }  
+}
