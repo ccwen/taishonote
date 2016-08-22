@@ -22,6 +22,8 @@ var TopRightMenu=React.createClass({
 		return (
 			E("div",{style:styles.container},
 				E("div",{style:styles.viewcontrols},
+					E("input",{value:this.props.pointer}),
+					E("button",{},"copy"),
 					E("button",{onClick:this.toggleLineNumber},"行標"),
 					E("button",{onClick:this.toggleLayout},label)
 				)
