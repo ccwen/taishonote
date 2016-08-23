@@ -33,10 +33,7 @@ var advanceChar=function(text,adv){
 	}
 	return ch;
 }
-//advance n taisho char and return new text pos
-var advanceTaisho=function(textpos,text,adv,filestart){
 
-}
 var textpos2pointer=function(textpos,text,lb,lb_pointer,filestart,bol){
 	var at=indexOfSorted(lb,textpos);
 	if (at>0) {
@@ -110,9 +107,26 @@ var afterLoad=function(file){
 	file.decompressed=true;
 }
 
+var packRange=function(from,to){
+	if (from>to) {
+		var t=to;
+		to=from;
+		from=t;
+	}
+
+	var delta=to-from;
+	return delta*1073741824+from;
+}
+var unpackRange=function(rp){
+	var delta=Math.floor((rp/1073741824)%65536);
+	var from=rp-delta*1073741824;
+	return [from,delta+from];
+}
 module.exports={setActionHandler,breakline,getFileStart,
-	nextLine:codec.nextLine,formatPointer:codec.unpack,
+	nextiLne:codec.nextLine,formatPointer:codec.unpack,
 	afterLoad,
 	cursor2pointer,
+	packRange,
+	unpackRange,
 	textpos2pointer,pointer2textpos
 };

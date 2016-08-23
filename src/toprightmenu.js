@@ -7,7 +7,7 @@ var TopRightMenu=React.createClass({
 		action:PT.func.isRequired
 	},
 	getInitialState:function(){
-		return {breakby:"lb"}
+		return {breakby:"lb",pointer:""}
 	},
 	toggleLayout:function(){
 		var breakby=this.state.breakby=="lb"?"p":"lb"
@@ -17,13 +17,22 @@ var TopRightMenu=React.createClass({
 	toggleLineNumber:function(){
 		this.context.action("toggleLineNumber",0);
 	},
+	onChange:function(e){
+		this.setState({pointer:e.target.value});
+	},
+	onKeyPress:function(e){
+		if (e.key=="Enter") this.gotoRange();
+	},
+	gotoRange:function(){
+		console.log("goto",this.state.pointer);
+	},
 	render:function(){
 		var label={"lb":"原書","p":"段落"}[this.state.breakby];
 		return (
 			E("div",{style:styles.container},
 				E("div",{style:styles.viewcontrols},
-					E("input",{value:this.props.pointer}),
-					E("button",{},"copy"),
+					E("input",{value:this.state.pointer,size:10,
+						onKeyPress:this.onKeyPress,onChange:this.onChange}),
 					E("button",{onClick:this.toggleLineNumber},"行標"),
 					E("button",{onClick:this.toggleLayout},label)
 				)
