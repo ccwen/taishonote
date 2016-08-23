@@ -1,10 +1,3 @@
-scaffold for ksana2015 app
+Taisho Note Sharing System
 ====
-
-install github.com/ksanaforge/ksana2015
-
-ks mkdb sample
-
-react-bundle.js is created with 
-
-    browserify -r react -r react/addons > react-bundle.js
+dependency: github.com/ksanaforge/ksana2015

@@ -7,7 +7,7 @@ var TopRightMenu=React.createClass({
 		action:PT.func.isRequired
 	},
 	getInitialState:function(){
-		return {breakby:"lb",pointer:""}
+		return {breakby:"lb",pointer:"01p12a0101+5"}
 	},
 	toggleLayout:function(){
 		var breakby=this.state.breakby=="lb"?"p":"lb"
@@ -24,7 +24,7 @@ var TopRightMenu=React.createClass({
 		if (e.key=="Enter") this.gotoRange();
 	},
 	gotoRange:function(){
-		console.log("goto",this.state.pointer);
+		this.context.action("goto",this.state.pointer);
 	},
 	render:function(){
 		var label={"lb":"原書","p":"段落"}[this.state.breakby];

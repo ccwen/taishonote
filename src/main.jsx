@@ -19,6 +19,7 @@ var maincomponent = React.createClass({
   }
   ,render: function() {
     return E(TwoColumnMode,{
+      rule,
       leftDocs,rightDocs,leftDoc,rightDoc,
       leftMenu,rightMenu,leftView,rightView});
   }
