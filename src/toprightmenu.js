@@ -7,7 +7,7 @@ var TopRightMenu=React.createClass({
 		action:PT.func.isRequired
 	},
 	getInitialState:function(){
-		return {breakby:"lb",pointer:"01p12a0101+5"}
+		return {breakby:"lb",pointer:"@t01p0011a0402+82"} //長阿含-->如是我聞
 	},
 	toggleLayout:function(){
 		var breakby=this.state.breakby=="lb"?"p":"lb"

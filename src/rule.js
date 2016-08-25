@@ -32,6 +32,9 @@ var isSurrogate=function(c){
 var isChar=function(c){
 	return (c>=0x3400 &&c<=0x9fff) || (c>0x20 && c<0x80);	
 }
+var isSkipChar=function(c){
+	return (!(isChar(c)||isSurrogate(c)));
+}
 //advance n unicode characters, return new pointer
 var advanceChar=function(text,adv){
 	var i=0,ch=0;
@@ -48,6 +51,22 @@ var advanceChar=function(text,adv){
 	return ch;
 }
 
+//advance taisho char , return number of unicode char.
+var advanceTaishoChar=function(text,adv){
+	var i=0;
+	while (i<text.length && adv) {
+		var c=text.charCodeAt(i);
+		if (isChar(c)){
+			adv--;
+		} else if (isSurrogate(c)){
+			adv--;
+			i++;
+		}
+		i++;		
+	}
+	return i;
+}
+
 var textpos2pointer=function(textpos,text,lb,lb_pointer,filestart,bol){
 	var at=indexOfSorted(lb,textpos);
 	if (at>0) {
@@ -60,8 +79,18 @@ var textpos2pointer=function(textpos,text,lb,lb_pointer,filestart,bol){
 		return filestart+advanceChar(text,textpos);
 	}
 }
-var pointer2textpos=function(pointer,text,lb){
 
+var pointer2textpos=function(pointer,text,lb,lb_pointer,filestart){
+	var at=indexOfSorted(lb_pointer,pointer);
+	if (at>0) {
+		at--;
+		var ch=codec.charOf(pointer)-1;
+		var linetext=text.substring(lb[at-1],lb[at]);
+		var r=lb[at-1]+advanceTaishoChar(linetext,ch);
+		return r;
+	} else {
+		return advanceTaishoChar(text,codec.charOf(pointer));
+	}
 }
 
 var breakline=function(file,by){
@@ -82,6 +111,10 @@ var breakline=function(file,by){
 var cursor2pointer=function(textpos,file,bol){
 	var p=textpos2pointer(textpos,file.content,file.lb,file.lb_pointer,file.pointer,bol);
 	return p;
+}
+var pointer2cursor=function(pointer,file){
+	var c=pointer2textpos(pointer,file.content,file.lb,file.lb_pointer,file.pointer);
+	return c;
 }
 var setActionHandler=function(_actionhandler){
 	actionhandler=_actionhandler;
@@ -148,14 +181,17 @@ var parsePointer=function(str){
 	var from=codec.pack(m[1]+"p"+m[2]+m[3]+m[4]);
 	var to=from+parseInt(m[5],16);
 	var file=getFileByPointer(from);
-	return {file,from,to};
+	var range=packRange(from,to);
+	return {file,from,to,range};
 }
 module.exports={setActionHandler,breakline,getFileStart,
 	nextiLne:codec.nextLine,formatPointer,
 	afterLoad,
 	cursor2pointer,
+	pointer2cursor,
 	parsePointer,
 	packRange,
 	unpackRange,
-	textpos2pointer,pointer2textpos
+	textpos2pointer,pointer2textpos,
+	isSkipChar
 };
