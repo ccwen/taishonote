@@ -2,7 +2,7 @@
 body {margin:0px;}
 #main {font-size:150%;}
 .hl0 {color:red;}
-
+.scrollTo {background-color: red;opacity:0.6;}
 .CodeMirror-linenumber {
 	font-size:9pt;
 }

@@ -10424,6 +10424,12 @@ var CodeMirrorComponent = React.createClass({
 		this.codeMirror.on('cursorActivity',this.cursorActivity);
 		this.codeMirror.on('mousedown',this.onMouseDown);
 		this.codeMirror.on('viewportChange',this.onViewportChange);
+
+		this.codeMirror.on('copy',this.props.onCopy);
+		this.codeMirror.on('cut',this.props.onCut);
+		this.codeMirror.on('paste',this.props.onPaste);
+
+
 		this.props.onKeyUp && this.codeMirror.on('keyup',this.props.onKeyUp);
 		this.props.onKeyDown && this.codeMirror.on('keydown',this.props.onKeyDown);
 		this.props.onKeyPress&& this.codeMirror.on('keypress',this.props.onKeyPress);

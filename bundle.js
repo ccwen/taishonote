@@ -1,67 +1,67 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"C:\\ksana2015\\cbeta-address\\codec.js":[function(require,module,exports){
-var pat=/[A-Z]?(\d{2,3})p(\d\d\d\d)([abcd])(\d\d)(\d\d)/
-var sides={a:0,b:1,c:2,d:3};
+var pat=/[A-Z]?(\d{1,3})p(\d{1,4})([abcd])(\d\d)(\d{0,2})/
+var cols={a:0,b:1,c:2,d:3};
 var pack=function(str){
 	var r=str.match(pat);
 	if (!r) return null;
 
-	var side=sides[r[3]];
+	var col=cols[r[3]];
 	var vol=parseInt(r[1],10), page=parseInt(r[2],10);
 	var line=parseInt(r[4],10), ch=parseInt(r[5]);
-	var r={ vol,page,side,line,ch};
+	var r={ vol,page,col,line,ch};
 	return compose( r);
 }
 
 var decompose=function(c){
 	var ch=c%32;
 	var line=Math.floor((c/32)%32);
-	var side=Math.floor((c/1024)%4);
+	var col=Math.floor((c/1024)%4);
 	var page=Math.floor((c/4096)%2048);
 	var vol=Math.floor((c/8388608)%128);
 
-	var r={vol,page,side,line,ch };
+	var r={vol,page,col,line,ch };
 	return r;
 }
 var compose=function(r) {
 	var res=r.vol*8388608 //Vol
 	+r.page*4096  //pg
-	+r.side*1024               //side
+	+r.col*1024               //col
 	+r.line*32    //line
 	+r.ch;      //ch
 	return res;
 }
 //faster than decompose
-var charOf=function(c){
+var charOf=function(c){ //5bits
 	return c%32;
 }
 var lineOf=function(c){
-	return Math.floor((c/32)%32);
+	return Math.floor((c/32)%32); //5 bits
 }
 var pageOf=function(c){
-	return Math.floor((c/4096)%2048);
+	return Math.floor((c/4096)%2048); //11bits
 }
-var sideOf=function(c){
-	return Math.floor((c/1024)%4);
+var colOf=function(c){
+	return Math.floor((c/1024)%4); //2 bits
 }
 var volOf=function(c){
-	Math.floor((c/8388608)%128);
+	Math.floor((c/8388608)%128);//7 bits
 }
 
 var unpack=function(pointer){
 	var r=decompose(pointer);
 	r.ch="0"+r.ch; r.ch=r.ch.substr(r.ch.length-2);
 	r.line="0"+r.line; r.line=r.line.substr(r.line.length-2);
-	r.side=["a","b","c","d"][r.side];
+	r.col=["a","b","c","d"][r.col];
 	r.page="000"+r.page; r.page=r.page.substr(r.page.length-4);
 	r.vol="0"+r.vol; r.vol=r.vol.substr(r.vol.length-2);
 
-	var q=r.vol+"p"+r.page+r.side+r.line+r.ch;
+	var q=r.vol+"p"+r.page+r.col+r.line+r.ch;
 	return q;
 }
 //cannot cross volumn
 var lineDistance=function(p1,p2){
-	return (pageOf(p2)*87+sideOf(p2)*29+lineOf(p2) )
-	- (pageOf(p1)*87+sideOf(p1)*29+lineOf(p1));
+	return (pageOf(p2)*87+colOf(p2)*29+lineOf(p2) )
+	- (pageOf(p1)*87+colOf(p1)*29+lineOf(p1));
 }
 
 var nextLine=function(pointer,advanceline){
@@ -70,11 +70,11 @@ var nextLine=function(pointer,advanceline){
 
 	while (advanceline) {//naive...room to improve
 		if (d.line==29) {
-			if (d.side==2) {
-				d.side=0;
+			if (d.col==2) {
+				d.col=0;
 				d.page++;
 			} else {
-				d.side++;
+				d.col++;
 			}
 			d.line=1;
 		} else {
@@ -88,8 +88,9 @@ var nextLine=function(pointer,advanceline){
 //A range =  delta<<32 + pointer
 //delta should not cross a juan , less than 16 bits
 
+
 module.exports={pack,unpack,compose,decompose,nextLine
-,charOf,lineOf,sideOf,pageOf,volOf,lineDistance}
+,charOf,lineOf,colOf,pageOf,volOf,lineDistance}
 },{}],"C:\\ksana2015\\node_modules\\ksana2015-parallel\\index.js":[function(require,module,exports){
 var model=require("./src/model");
 var TwoColumnMode=require("./src/twocolumnmode");
@@ -271,6 +272,7 @@ var CMView=React.createClass({
 
 		var rule=this.getDocRule();
 		rule.setActionHandler(this.context.action);
+		this.text=res.data;
 		cm.setValue(res.data);
 	}
 	,onViewportChange:function(cm,from,to) {
@@ -299,6 +301,18 @@ var CMView=React.createClass({
 		}.bind(this),400); 
 		//might be big enough, otherwise onViewport will be trigger again, causing endless loop
 	}
+	,copiedText:""
+	,onCopy:function(cm,evt){
+		var rule=this.getDocRule();
+		if (this.copiedText===evt.target.value) {
+			if (rule.excerptCopy){
+				evt.target.value=rule.excerptCopy(evt.target.value, this.text, cm.indexFromPos(cm.getCursor()));
+				evt.target.select();//reselect the hidden textarea
+			}
+		} else {
+			this.copiedText=evt.target.value;
+		}
+	}
 	,render:function(){
 		var rule=this.getDocRule();
 		return E("div",{},
@@ -310,6 +324,7 @@ var CMView=React.createClass({
 				buttons:this.props.docs,selected:this.props.doc}),
 	  	E(CodeMirror,{ref:"cm",value:"",theme:"ambiance",readOnly:true,
   	  onCursorActivity:this.onCursorActivity
+  	  ,onCopy:this.onCopy
   	  ,onViewportChange:this.onViewportChange})
   	 )
 	}
@@ -333,7 +348,53 @@ var ControlPanel = React.createClass({
 });
 
 module.exports=ControlPanel;
-},{"./kepan":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\kepan.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\inputbox.js":[function(require,module,exports){
+},{"./kepan":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\kepan.js","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\coordinate.js":[function(require,module,exports){
+var textPosToRange=function(file,rule,cm){
+	var sels=cm.listSelections();
+	if (!sels.length)return;
+	var from=textPosToPointer(file,rule,cm,sels[0].anchor);
+	var to=textPosToPointer(file,rule,cm,sels[0].head);
+
+	var rp=rule.packRange(from,to);
+	return rp;
+}
+var textPosToPointer=function(file,rule,cm,cursor){
+	var textpos=cm.indexFromPos(cursor)-cursor.line;
+	var bol=!cursor.ch;
+	var pointer=rule.cursor2pointer(textpos,file,bol);
+	return pointer;
+}
+var indexOfSorted = function (array, obj) { 
+  var low = 0,
+  high = array.length-1;
+  while (low < high) {
+    var mid = (low + high) >> 1;
+    array[mid] < obj ? low = mid + 1 : high = mid;
+  }
+  return low;
+};
+var pointerToTextPos=function(file,rule,cm,pointer,linebreaks,includeRightPunc){
+	var atline=indexOfSorted(linebreaks,pointer);
+
+	var index=rule.pointer2cursor(pointer,file);
+
+	if (includeRightPunc) while ((index<file.content.length) &&
+		rule.isSkipChar(file.content.charCodeAt(index+1))) index++;
+	
+	var pos=cm.posFromIndex(index+atline);
+
+	return pos;
+}
+
+var rangeToTextPos=function(file,rule,cm,range,linebreaks){
+	var r=rule.unpackRange(range);
+	var from=pointerToTextPos(file,rule,cm,r[0],linebreaks,true);
+	var to=pointerToTextPos(file,rule,cm,r[1],linebreaks);
+	return {from,to};
+}
+module.exports={textPosToPointer,textPosToRange,
+	rangeToTextPos,pointerToTextPos};
+},{}],"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\inputbox.js":[function(require,module,exports){
 var React=require("react");
 var E=React.createElement;
 var PT=React.PropTypes;
@@ -423,7 +484,9 @@ var KepanPanel = React.createClass({
   	this.setState({toc:obj.data});
   }
   ,onSelect:function(ctx,node,i,nodes){
+    debugger;
     this.context.action("gokepan",node.l);
+    if (node.l2) this.context.action("gokepan",node.l2);
   }
   ,renderToc:function(){
     if(this.state.tofind.trim()){
@@ -488,11 +551,19 @@ var loadscriptcb=function(data){
 	if (loadingobj) {
 		var o=JSON.parse(JSON.stringify(loadingobj));
 		o.data=data;
+		for (var key in loadingobj){
+			if (typeof loadingobj[key]=="function") o[key]=loadingobj[key];
+		}
 	} else {
 		var o={filename:loadingfilename,data};
 	}
 	
-	action("loaded",o);
+	if (o.cb) {
+		setTimeout(function(){o.cb(o)},0);
+	} else {
+		action("loaded",o);	
+	}
+	
 	loadingfilename="";
 	loadingobj=null;
 	setTimeout(fireEvent,0);
@@ -514,7 +585,11 @@ var _loadfile=function(obj){
 	if (datafiles[filename]) {
 		o=JSON.parse(JSON.stringify(obj));
 		o.data=datafiles[filename];
-		action("loaded",o);
+		if (obj.cb){
+			setTimeout(function(){obj.cb(o)},0);
+		} else {
+			action("loaded",o);	
+		} 
 		setTimeout(fireEvent,0);
 	} else {
 		loadingfilename=filename;
@@ -678,12 +753,15 @@ module.exports=NotePopup;
 },{"ksana-codemirror":"ksana-codemirror","react":"react"}],"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\taishoview.js":[function(require,module,exports){
 var React=require("react");
 var ReactDOM=require("react-dom");
+require("./loadfile");
+
 var E=React.createElement;
 var PT=React.PropTypes;
 var CodeMirror=require("ksana-codemirror").Component;
 var TopRightMenu=require("./toprightmenu");
 var NotePopup=require("./notepopup");
-require("./loadfile");
+var coordinate=require("./coordinate");
+var verbose=false;
 
 var TaishoView=React.createClass({
 	getInitialState:function(){
@@ -696,19 +774,37 @@ var TaishoView=React.createClass({
 	}
 	,componentWillReceiveProps:function(nextProps) {
 		if (nextProps.doc!==this.props.doc) {
-			this.context.getter("file",{filename:nextProps.doc,side:nextProps.side});	
+			this.context.getter("file",{filename:nextProps.doc,side:nextProps.side,cb:this.onLoaded});
+		} else if (nextProps.scrollTo!==this.props.scrollTo) {
+			this.scrollIntoView(nextProps.scrollTo);
 		}
 	}
 	,componentDidMount:function(){
 		this.defaultListeners();
 		if (this.props.doc) {
-			this.context.getter("file",{filename:this.props.doc,side:this.props.side});
+			this.context.getter("file",{filename:this.props.doc,side:this.props.side,cb:this.onLoaded});
 		}
 	}
+	,onCopy:function(cm,event){
+		var rp=coordinate.textPosToRange(this.data,this.rule,cm);
+		var f=this.rule.formatPointer(rp);
+		event.target.value=f;
+		event.target.select();
+	}
 	,defaultListeners:function(){
-		this.context.store.listen("loaded",this.onLoaded,this);
+		//this.context.store.listen("loaded",this.onLoaded,this); , callback supply in getter
 		this.context.store.listen("layout",this.onLayout,this);
 		this.context.store.listen("toggleLineNumber",this.onToggleLineNumber,this);
+		this.context.store.listen("goto",this.goto,this);
+	}
+	,goto:function(str){
+		if(this.props.side)return;
+
+		var p=this.rule.parsePointer(str);
+		if (!p) return;
+		var scrollTo=this.rule.formatPointer(this.rule.packRange(p.from,p.to));
+
+		this.context.getter("setDoc",{side:this.props.side,filename:p.file,scrollTo});
 	}
 	,getDocRule:function(doc){
 		doc=doc||this.props.doc;
@@ -718,12 +814,15 @@ var TaishoView=React.createClass({
 				return docs[i].rule;
 			}
 		}
+		return this.props.rule;
 	}
 	,onLayout:function(mode){
 		var rule=this.getDocRule();
 		if (!rule)return;
+		this.rule=rule;
 		var cm=this.refs.cm.getCodeMirror();
-		var text=rule.breakline(this.data,mode||"lb");
+		var {pointers,text}=rule.breakline(this.data,mode||"lb");
+		this.pointers=pointers;
 		cm.setValue(text);
 	}
 	,onToggleLineNumber:function(side){
@@ -735,35 +834,62 @@ var TaishoView=React.createClass({
 	,onLoaded:function(res){
 		if (res.side!==this.props.side) return;
 		var cm=this.refs.cm.getCodeMirror();
-
-		var rule=this.getDocRule();
-		rule.setActionHandler(this.context.action);
-
-		var text=rule.breakline(res.data,"lb");
+		this.rule=this.getDocRule();
+		this.rule.setActionHandler(this.context.action);
+		this.rule.afterLoad(res.data);
+		var {pointers,text}=this.rule.breakline(res.data,"lb");
 		this.data=res.data;
+		this.pointers=pointers;
 		cm.setValue(text);
+		this.scrollIntoView(this.props.scrollTo);
+	}
+	,scrollIntoView:function(rangeHuman){
+		if (!this.data||!this.rule)return;
+		if (this.scrollTo!==rangeHuman) {
+			var cm=this.refs.cm.getCodeMirror();
+			var parsed=this.rule.parsePointer(rangeHuman);
+			var R=coordinate.rangeToTextPos(this.data,this.rule,cm,parsed.range,this.pointers);
+
+			cm.markText(R.from,R.to,{className:"scrollTo",clearOnEnter:true});
+			cm.scrollIntoView({from:R.from,to:R.to});
+			this.scrollTo=rangeHuman;
+		}
+	}
+	,atPointer:function(pointer){
+		if (verbose) console.log(pointer,this.rule.formatPointer(pointer));
 	}
 	,onCursorActivity:function(cm){
-		var cursor=cm.listSelections();
-		console.log(cursor);
+		clearTimeout(this.cursortimer);
+		this.cursortimer=setTimeout(function(){
+			var cm=this.refs.cm.getCodeMirror();
+			var pointer=coordinate.textPosToPointer(this.data,this.rule,cm,cm.getCursor());
+			this.atPointer(pointer);
+		}.bind(this),300);
 	}
+	,pointers:[]
 	,lineNumberFormatter:function(line){
-		var rule=this.getDocRule();
-		if (!rule)return line;
+		if (!this.rule)return line;
+		var pointer=this.pointers[line-1];
+		if (!pointer) return "";
 
-		var start=rule.getFileStart(this.props.doc);
-		var pointer=rule.nextLine(start,line);
-		var marker=rule.formatPointer(pointer);
-		marker=marker.substr(3,7);
+		var marker=this.rule.formatPointer(pointer);
+
+		marker=marker.substr(5,7);
+
 		while (marker[0]=="0")marker=marker.substr(1);
 		return marker;
+	}
+	,onBeforeChange:function(cm,chobj){
+		if (chobj.origin=="setValue") return;
+		chobj.cancel();
 	}
 	,render:function(){
 		var Menu=this.props.menu||TopRightMenu;
 		return E("div",{},
-			E(Menu,{side:this.props.side,onSetDoc:this.onSetDoc,
-				buttons:this.props.docs,selected:this.props.doc}),
-	  	E(CodeMirror,{ref:"cm",value:"",theme:"ambiance",readOnly:true
+			E(Menu,{side:this.props.side,buttons:this.props.docs,selected:this.props.doc}),
+	  	E(CodeMirror,{ref:"cm",value:"",theme:"ambiance"
+	  		,onCopy:this.onCopy
+	  		,onBeforeChange:this.onBeforeChange
 	  		,lineNumbers:true
 	  		,lineNumberFormatter:this.lineNumberFormatter
 	  		,onCursorActivity:this.onCursorActivity})
@@ -771,7 +897,7 @@ var TaishoView=React.createClass({
 	}	
 })
 module.exports=TaishoView;
-},{"./loadfile":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\loadfile.js","./notepopup":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\notepopup.js","./toprightmenu":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\toprightmenu.js","ksana-codemirror":"ksana-codemirror","react":"react","react-dom":"react-dom"}],"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\tocresult.js":[function(require,module,exports){
+},{"./coordinate":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\coordinate.js","./loadfile":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\loadfile.js","./notepopup":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\notepopup.js","./toprightmenu":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\toprightmenu.js","ksana-codemirror":"ksana-codemirror","react":"react","react-dom":"react-dom"}],"C:\\ksana2015\\node_modules\\ksana2015-parallel\\src\\tocresult.js":[function(require,module,exports){
 var React=require("react");
 var E=React.createElement;
 var PT=React.PropTypes;
@@ -910,11 +1036,11 @@ var TwoColumn = React.createClass({
   	return E("div",{style:this.props.style},
   		E("div",{style:{display:'flex'}},
   			E("div",{style:{flex:1}},
-  				E(LeftView,{side:0,menu:this.props.leftMenu,
-            doc:this.props.leftDoc,docs:this.props.leftDocs})),
+  				E(LeftView,{side:0,menu:this.props.leftMenu,rule:this.props.rule,
+            doc:this.props.leftDoc,docs:this.props.leftDocs,scrollTo:this.props.scrollTo})),
   			E("div",{style:{flex:1}},
-  				E(RightView,{side:1,menu:this.props.rightMenu,
-            doc:this.props.rightDoc,docs:this.props.rightDocs}))
+  				E(RightView,{side:1,menu:this.props.rightMenu,rule:this.props.rule,
+            doc:this.props.rightDoc,docs:this.props.rightDocs,scrollTo:this.props.scrollTo}))
   		)
   	)
   }
@@ -934,9 +1060,9 @@ var modemain = React.createClass({
   getInitialState:function() {
     return {rightDoc:this.props.rightDoc,leftDoc:this.props.LeftDoc};
   }
-  ,onSetDoc:function(side,filename){
-    if (side===0) this.setState({leftDoc:filename});
-    else if (side===1) this.setState({rightDoc:filename});
+  ,onSetDoc:function({side,filename,scrollTo}){
+    if (side===0) this.setState({leftDoc:filename,scrollTo});
+    else if (side===1) this.setState({rightDoc:filename,scrollTo});
   }
   ,componentDidMount:function(){
     registerGetter("setDoc",this.onSetDoc);
@@ -959,6 +1085,7 @@ var modemain = React.createClass({
     props2.style=styles.body;
     props2.rightDoc=this.state.rightDoc||props2.rightDoc;
     props2.leftDoc=this.state.leftDoc||props2.leftDoc;
+    props2.scrollTo=this.state.scrollTo;
 
     return E("div",
       {style:styles.topcontainer},
@@ -2217,6 +2344,17 @@ mkdirP.sync = function sync (p, mode, made) {
 
 module.exports = mkdirP.mkdirp = mkdirP.mkdirP = mkdirP;
 
+},{}],"C:\\ksana2015\\taishonote\\data\\jinjuan2vol.js":[function(require,module,exports){
+var jinjuan2vol=function(jin,juan){
+	var n=parseInt(jin);
+	if (n<99) return 1;
+	if (n<152) return 2;
+}
+module.exports=jinjuan2vol;
+},{}],"C:\\ksana2015\\taishonote\\data\\juan.js":[function(require,module,exports){
+module.exports={"juanname":["1.1","1.2"]
+,"juanstart":[8392736,8433728]
+}
 },{}],"C:\\ksana2015\\taishonote\\index.js":[function(require,module,exports){
 var React=require("react");
 var ReactDOM=require("react-dom");
@@ -2248,6 +2386,7 @@ var maincomponent = React.createClass({displayName: "maincomponent",
   }
   ,render: function() {
     return E(TwoColumnMode,{
+      rule,
       leftDocs,rightDocs,leftDoc,rightDoc,
       leftMenu,rightMenu,leftView,rightView});
   }
@@ -2256,26 +2395,202 @@ module.exports=maincomponent;
 },{"./rule":"C:\\ksana2015\\taishonote\\src\\rule.js","./toprightmenu":"C:\\ksana2015\\taishonote\\src\\toprightmenu.js","ksana2015-parallel":"C:\\ksana2015\\node_modules\\ksana2015-parallel\\index.js","react":"react"}],"C:\\ksana2015\\taishonote\\src\\rule.js":[function(require,module,exports){
 var actionhandler=null;
 var codec=require("../../cbeta-address/codec");//shoudl move to node_modules
+var Juan=require("../data/juan");
+var jinjuan2vol=require("../data/jinjuan2vol");
+var getFileByPointer=function(pointer){
+	var i=indexOfSorted(Juan.juanstart,pointer);
+	if (Juan.juanstart[i]>pointer)i--;
+	var m=Juan.juanname[i].match(/(\d+)([AB]?)\.(\d+)/);
+	var vol="0"+jinjuan2vol(m[1],parseInt(m[3]));
+	vol=vol.substr(vol.length-2);
+	var n = "0000"+m[1]; n=n.substr(n.length-4);
+	var ab=m[2];//some sutra has A, B suffix
+	var juan="00"+m[3];juan=juan.substr(juan.length-3);
+
+	return "T"+vol+"/"+"T"+vol+"n"+n+ab+"_"+juan;
+}
 var getFileStart=function(){
 	return codec.pack("01p0001a0000");
 }
-var breakline=function(file,by){
-	var breaker=file[by];
-	var out="",offset=0;
-	for (var i=0;i<breaker.length;i++){
-		out+=file.content.substr(offset,breaker[i])+"\n";
-		offset+=breaker[i];
+var indexOfSorted = function (array, obj) { 
+  var low = 0,
+  high = array.length-1;
+  while (low < high) {
+    var mid = (low + high) >> 1;
+    array[mid] < obj ? low = mid + 1 : high = mid;
+  }
+  return low;
+};
+var isSurrogate=function(c){
+	return c>=0xd800 &&c<=0xdfff;
+}
+var isChar=function(c){
+	return (c>=0x3400 &&c<=0x9fff) || (c>0x20 && c<0x80);	
+}
+var isSkipChar=function(c){
+	return (!(isChar(c)||isSurrogate(c)));
+}
+//advance n unicode characters, return new pointer
+var advanceChar=function(text,adv){
+	var i=0,ch=0;
+	while (i<text.length && i<adv) {
+		var c=text.charCodeAt(i);
+		if (isChar(c)){
+			ch++;
+		} else if (isSurrogate(c)){
+			ch++;
+			i++;
+		}
+		i++;
 	}
-	return out;
+	return ch;
 }
 
+//advance taisho char , return number of unicode char.
+var advanceTaishoChar=function(text,adv){
+	var i=0;
+	while (i<text.length && adv) {
+		var c=text.charCodeAt(i);
+		if (isChar(c)){
+			adv--;
+		} else if (isSurrogate(c)){
+			adv--;
+			i++;
+		}
+		i++;		
+	}
+	return i;
+}
+
+var textpos2pointer=function(textpos,text,lb,lb_pointer,filestart,bol){
+	var at=indexOfSorted(lb,textpos);
+	if (at>0) {
+		if (textpos==lb[at] &&bol) return lb_pointer[at+1];//<p> at begining of lb
+
+		var delta=textpos-lb[at-1];
+		var linetext=text.substring(lb[at-1],lb[at]);
+		return lb_pointer[at]+advanceChar(linetext,delta);
+	} else {
+		return filestart+advanceChar(text,textpos);
+	}
+}
+
+var pointer2textpos=function(pointer,text,lb,lb_pointer,filestart){
+	var at=indexOfSorted(lb_pointer,pointer);
+	if (at>0) {
+		at--;
+		var ch=codec.charOf(pointer)-1;
+		var linetext=text.substring(lb[at-1],lb[at]);
+		var r=lb[at-1]+advanceTaishoChar(linetext,ch);
+		return r;
+	} else {
+		return advanceTaishoChar(text,codec.charOf(pointer));
+	}
+}
+
+var breakline=function(file,by){
+	var breaker=file[by];
+	var out="",offset=0, prev=0,pointers=file[by+"_pointer"]||[];
+	var stock=file[by+"_pointer"];
+	for (var i=0;i<breaker.length;i++){
+		out+=file.content.substring(prev,breaker[i])+"\n";
+		if (pointers !== stock ) {
+			pointers.push(textpos2pointer(prev,file.content,file.lb,file.lb_pointer,file.pointer));
+		}
+		prev=breaker[i];
+	}
+	if (!stock) file[by+"_pointer"]=pointers;
+	return {text:out,pointers};
+}
+
+var cursor2pointer=function(textpos,file,bol){
+	var p=textpos2pointer(textpos,file.content,file.lb,file.lb_pointer,file.pointer,bol);
+	return p;
+}
+var pointer2cursor=function(pointer,file){
+	var c=pointer2textpos(pointer,file.content,file.lb,file.lb_pointer,file.pointer);
+	return c;
+}
 var setActionHandler=function(_actionhandler){
 	actionhandler=_actionhandler;
 }
 
+var decompressDelta=function(arr){
+	for (var i=1;i<arr.length;i++) {
+		arr[i]+=arr[i-1];
+	}
+}
+//pointer of each lb
+var buildlbpointer=function(file){
+	var prev=file.pointer;
+
+	/// file.lb[0] is offset of start of second line
+	// file.lb_pointer has one more entry for first line , easier to render
+	var pointers=[file.pointer];
+
+	for (var i=1;i<file.lb.length;i++) {
+		pointers.push(codec.nextLine(prev));
+		prev=pointers[pointers.length-1];
+	}
+	return pointers;
+}
+var afterLoad=function(file){
+	if (file.decompressed)return;
+	if (typeof file.pointer=="string") {
+		file.pointer=codec.pack(file.pointer);
+	}
+
+	if (file.lb) {
+		decompressDelta(file.lb);
+		file.lb_pointer=buildlbpointer(file);
+	}
+	if (file.p) decompressDelta(file.p);
+
+	file.decompressed=true;
+}
+
+var packRange=function(from,to){
+	if (from>to) {
+		var t=to;
+		to=from;
+		from=t;
+	}
+
+	var delta=to-from;
+	return delta*1073741824+from;
+}
+var unpackRange=function(rp){
+	var delta=Math.floor((rp/1073741824)%(65536*128));//max 23 bits, 53(js real int)-30 bits
+	var from=rp-delta*1073741824;
+	return [from,delta+from];
+}
+var formatPointer=function(pointer){
+	var r=unpackRange(pointer);
+	var delta=r[1]-r[0];
+	var t="@t"+codec.unpack(r[0])+(delta?("+"+delta.toString(16)):"");
+	return t;//t.replace(/p0+/,"p").replace(/t0+/,"t");
+}
+var parsePointer=function(str){
+	var m=str.match(/(\d+)p(\d+)([a-c])(\d{1,4})\+([0-9abcdef]*)/);
+	if (!m) return null;
+	var from=codec.pack(m[1]+"p"+m[2]+m[3]+m[4]);
+	var to=from+parseInt(m[5],16);
+	var file=getFileByPointer(from);
+	var range=packRange(from,to);
+	return {file,from,to,range};
+}
 module.exports={setActionHandler,breakline,getFileStart,
-	nextLine:codec.nextLine,formatPointer:codec.unpack};
-},{"../../cbeta-address/codec":"C:\\ksana2015\\cbeta-address\\codec.js"}],"C:\\ksana2015\\taishonote\\src\\toprightmenu.js":[function(require,module,exports){
+	nextiLne:codec.nextLine,formatPointer,
+	afterLoad,
+	cursor2pointer,
+	pointer2cursor,
+	parsePointer,
+	packRange,
+	unpackRange,
+	textpos2pointer,pointer2textpos,
+	isSkipChar
+};
+},{"../../cbeta-address/codec":"C:\\ksana2015\\cbeta-address\\codec.js","../data/jinjuan2vol":"C:\\ksana2015\\taishonote\\data\\jinjuan2vol.js","../data/juan":"C:\\ksana2015\\taishonote\\data\\juan.js"}],"C:\\ksana2015\\taishonote\\src\\toprightmenu.js":[function(require,module,exports){
 var React=require("react");
 var E=React.createElement;
 var PT=React.PropTypes;
@@ -2285,7 +2600,7 @@ var TopRightMenu=React.createClass({displayName: "TopRightMenu",
 		action:PT.func.isRequired
 	},
 	getInitialState:function(){
-		return {breakby:"lb"}
+		return {breakby:"lb",pointer:"@t01p0011a0402+82"} //長阿含-->如是我聞
 	},
 	toggleLayout:function(){
 		var breakby=this.state.breakby=="lb"?"p":"lb"
@@ -2295,11 +2610,22 @@ var TopRightMenu=React.createClass({displayName: "TopRightMenu",
 	toggleLineNumber:function(){
 		this.context.action("toggleLineNumber",0);
 	},
+	onChange:function(e){
+		this.setState({pointer:e.target.value});
+	},
+	onKeyPress:function(e){
+		if (e.key=="Enter") this.gotoRange();
+	},
+	gotoRange:function(){
+		this.context.action("goto",this.state.pointer);
+	},
 	render:function(){
 		var label={"lb":"原書","p":"段落"}[this.state.breakby];
 		return (
 			E("div",{style:styles.container},
 				E("div",{style:styles.viewcontrols},
+					E("input",{value:this.state.pointer,size:10,
+						onKeyPress:this.onKeyPress,onChange:this.onChange}),
 					E("button",{onClick:this.toggleLineNumber},"行標"),
 					E("button",{onClick:this.toggleLayout},label)
 				)
